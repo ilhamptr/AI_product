@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Applications</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-violet-50 p-6">
+
+  <div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <div>
+      <h1 class="text-2xl font-bold text-violet-700">Job Applications</h1>
+      <p class="text-gray-600">Manage and review job applications from candidates</p>
+    </div>
+
+    <!-- Applicant List -->
+    <div class="bg-white rounded-lg shadow p-4">
+      <h2 class="text-lg font-semibold text-gray-800 mb-4">Applicant List</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left border-collapse">
+          <thead>
+            <tr class="bg-violet-100 text-gray-700">
+              <th class="px-4 py-2">Applicant Name</th>
+              <th class="px-4 py-2">Contact</th>
+              <th class="px-4 py-2">Resume</th>
+              <th class="px-4 py-2">Applied Date</th>
+              <th class="px-4 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="applicantsTable" class="divide-y divide-gray-200">
+            <!-- Rows injected by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchApplicants() {
+      const token = localStorage.getItem("jwt");
+      if (!token) {
+        window.location.href = "login.html"; // redirect if not logged in
+        return;
+      }
+
+      try {
+        // Get the current page URL
+        const urlParams = new URLSearchParams(window.location.search);
+
+        // Extract the job_id parameter
+        const jobId = urlParams.get("id");
+        const response = await fetch(`http://localhost:8080/view-applicants/${encodeURIComponent(jobId)}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        if (!response.ok) {
+          window.location.href = "login.html";
+          return;
+        }
+
+        const applicants = await response.json();
+        renderApplicants(applicants);
+
+        // Update stats
+        // document.getElementById("totalApps").innerText = applicants.length;
+        const today = new Date().toISOString().split("T")[0];
+        const newToday = applicants.filter(a => a.CreatedAt.startsWith(today)).length;
+        // document.getElementById("newToday").innerText = newToday;
+        // document.getElementById("pending").innerText = applicants.length; // adjust if you track status
+      } catch (err) {
+        console.error("Error fetching applications:", err);
+        alert("Something went wrong. Try again later.");
+      }
+    }
+
+    function renderApplicants(applicants) {
+      const table = document.getElementById("applicantsTable");
+      table.innerHTML = ""; // clear old rows
+
+      applicants.forEach(app => {
+        const appliedDate = new Date(app.CreatedAt).toLocaleString();
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td class="px-4 py-3 font-medium text-gray-800">${app.ApplicantName}<br>
+            <span class="text-xs text-gray-500">ID: ${app.ID.substring(0,8)}...</span>
+          </td>
+          <td class="px-4 py-3">
+            <a href="mailto:${app.Email}" class="text-violet-600 hover:underline">${app.Email}</a><br>
+            <a href="tel:${app.PhoneNumber}" class="text-gray-600">${app.PhoneNumber}</a>
+          </td>
+          <td class="px-4 py-3">
+            <a href="http://localhost:8080/resumes/${app.ResumeFile}" target="_blank"
+               class="px-2 py-1 bg-gray-100 rounded text-violet-700 text-xs font-medium hover:underline">
+               ${app.ResumeFile}
+            </a>
+          </td>
+          <td class="px-4 py-3 text-gray-600">${appliedDate}</td>
+          <td class="px-4 py-3 flex gap-2">
+            <button class="px-3 py-1 bg-violet-600 text-white text-xs rounded hover:bg-violet-700">Review</button>
+            <button class="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">Contact</button>
+          </td>
+        `;
+        table.appendChild(row);
+      });
+    }
+
+    // Fetch applicants on page load
+    fetchApplicants();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Job Postings</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-8">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">My Job Postings</h1>
+    <button onclick="openModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700">
+      + Post New Job
+    </button>
+    <button onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600">
+        Logout
+    </button>
+  </div>
+
+  <!-- Stats -->
+  <div class="p-6">
+    <div class="mb-6 overflow-x-auto">
+      <div class="flex gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-4 min-w-max sm:min-w-0">
+        <div class="bg-white p-6 rounded-lg shadow text-center flex-1 min-w-[200px]">
+          <h3 class="text-lg font-semibold text-gray-700">Total Jobs</h3>
+          <p id="totalJobs" class="text-2xl font-bold text-purple-600">0</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow text-center flex-1 min-w-[200px]">
+          <h3 class="text-lg font-semibold text-gray-700">Active Jobs</h3>
+          <p id="activeJobs" class="text-2xl font-bold text-green-600">0</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow text-center flex-1 min-w-[200px]">
+          <h3 class="text-lg font-semibold text-gray-700">Inactive Jobs</h3>
+          <p id="inactiveJobs" class="text-2xl font-bold text-red-600">0</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow text-center flex-1 min-w-[200px]">
+          <h3 class="text-lg font-semibold text-gray-700">Latest Job</h3>
+          <p id="latestJob" class="text-sm font-medium text-gray-600">-</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Job Cards -->
+    <div id="jobsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+  </div>
+
+  <!-- Modal -->
+  <div id="jobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-lg p-6">
+      <h2 class="text-xl font-bold mb-4">Post New Job</h2>
+      <form id="jobForm" class="space-y-4">
+        <div>
+          <label class="block text-gray-700 font-medium">Job Title</label>
+          <input type="text" id="job_title" required
+            class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-purple-500" />
+        </div>
+        <div>
+          <label class="block text-gray-700 font-medium">Description</label>
+          <textarea id="description" rows="6" required
+            class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-purple-500"></textarea>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+  async function fetchJobs() {
+    const token = localStorage.getItem("jwt");
+    if (!token) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:8080/jobs", {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      const jobs = await response.json();
+
+      // Update stats
+      document.getElementById("totalJobs").innerText = jobs.length;
+      const activeCount = jobs.filter(j => j.Active).length;
+      const inactiveCount = jobs.length - activeCount;
+      document.getElementById("activeJobs").innerText = activeCount;
+      document.getElementById("inactiveJobs").innerText = inactiveCount;
+      if (jobs.length > 0) {
+        const latestJob = jobs.reduce((a, b) => new Date(a.CreatedAt) > new Date(b.CreatedAt) ? a : b);
+        document.getElementById("latestJob").innerText = latestJob.JobTitle;
+      }
+
+      // Render job cards
+      const container = document.getElementById("jobsContainer");
+      container.innerHTML = "";
+      jobs.forEach(job => {
+        const card = document.createElement("div");
+        card.className = "bg-white p-6 rounded-lg shadow";
+
+        card.innerHTML = `
+          <h2 class="text-lg font-semibold text-gray-800">${job.JobTitle}</h2>
+          <div class="flex gap-2 mt-3 flex-wrap">
+            <span class="px-2 py-1 text-xs rounded ${job.Active ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}">
+              ${job.Active ? "Active" : "Inactive"}
+            </span>
+          </div>
+          <p class="text-gray-600 mt-3">${job.Description.substring(0, 150)}...</p>
+          <div class="flex justify-between items-center mt-4 text-sm text-gray-500">
+            <span>📅 ${new Date(job.CreatedAt).toLocaleDateString()}</span>
+            <a href="applicant.html?id=${encodeURIComponent(job.ID)}" class="text-purple-600 font-medium">View applicants</a>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+    } catch (err) {
+      console.error("Error fetching jobs:", err);
+      window.location.href = "login.html";
+    }
+  }
+
+  // Modal controls
+  function openModal() {
+    document.getElementById("jobModal").classList.remove("hidden");
+  }
+  function closeModal() {
+    document.getElementById("jobModal").classList.add("hidden");
+  }
+
+  // Handle job form submit
+  document.getElementById("jobForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("jwt");
+    if (!token) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    const newJob = {
+      job_title: document.getElementById("job_title").value,
+      description: document.getElementById("description").value
+    };
+
+    try {
+      const res = await fetch("http://localhost:8080/add-job", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(newJob)
+      });
+
+      if (!res.ok) {
+        alert("Failed to create job");
+        return;
+      }
+
+      closeModal();
+      fetchJobs(); // reload jobs
+    } catch (error) {
+      console.error("Error posting job:", error);
+    }
+  });
+
+   // Logout function
+  function logout() {
+    localStorage.removeItem("jwt"); 
+    window.location.href = "login.html";
+  }
+
+  fetchJobs();
+</script>
+</body>
+</html>
